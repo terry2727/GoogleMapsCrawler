@@ -1,8 +1,16 @@
 from selenium.webdriver.chrome.options import Options
 from selenium import webdriver
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.common.by import By
+
 
 import logging
 import traceback
+import time
+
+MAX_WAIT = 20
+MAX_RETRY = 10
 
 class GoogleMapsCrawler:
 
@@ -55,4 +63,47 @@ class GoogleMapsCrawler:
 
         return input_driver
         
+    def sort_by_date(self, url):
+        self.driver.get(url)
+        wait = WebDriverWait(self.driver, MAX_WAIT)
+
+        # get into rating page
+        try:
+            time.sleep(5)
+            review_page_btn = self.driver.find_element_by_xpath('//button[@class=\'widget-pane-link\']')
+            review_page_btn.click()
+        except Exception as e:
+            self.logger.error(e)
+            self.logger.debug('Failed to click review page button!')
+
+        # open dropdown menu
+        clicked = False
+        tries = 0
+        while not clicked and tries < MAX_RETRY:
+            try:
+                if not self.debug:
+                    menu_bt = wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR, 'div.cYrDcjyGO77__container')))
+                else:
+                    menu_bt = wait.until(EC.element_to_be_clickable((By.XPATH, '//button[@data-value=\'Sort\']')))
+                menu_bt.click()
+
+                clicked = True
+                time.sleep(5)
+            except Exception as e:
+                tries += 1
+                self.logger.debug(e)
+                self.logger.warn('Failed to click recent button')
+
+            # failed to open the dropdown
+            if tries == MAX_RETRY:
+                return -1
         
+        # click the second element of the list: Most Recent (Moi Nhat)
+        recent_rating_bt = self.driver.find_elements_by_xpath('//li[@role=\'menuitemradio\']')[1] 
+        recent_rating_bt.click()
+
+        # wait to load review (ajax call)
+        time.sleep(5)
+
+        return 0
+    
